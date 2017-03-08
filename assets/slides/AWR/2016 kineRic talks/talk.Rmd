@@ -1,0 +1,482 @@
+---
+title: "Stream processing with R and Amazon Kinesis"
+shorttitle: "Stream processing with R and Kinesis"
+subtitle: "EARL 2016 London"
+author: "Gergely Daroczi"
+institute: "@daroczig"
+shortinstitute: "CARD.com"
+date: "September 15 2016"
+shortdate: "EARL 2016 London"
+output:
+  beamer_presentation:
+    template: card.tex
+---
+
+## About me
+
+\centering
+
+\includegraphics[width=0.65\textwidth]{images/java}
+
+\includegraphics[width=0.99\textwidth]{images/me-on-gh}
+
+## CARD.com’s View of the World
+
+\centering
+
+\includegraphics[width=0.7\textwidth]{images/twit}
+
+<!--
+aar
+especially if your target audience is those folks, who would like to order a prepaid debit card with an "I love R" logo -- right? The internet penetration among these guys is probably around 100%.
+-->
+
+## CARD.com’s View of the World
+
+<!--
+anyway, we have of course other designs as well (like several thousands), which is pretty cool for data scientist like us -- to compare the behaviour and compute the performance of eg a "walking dead" or "grumpy cat" cardholder -- which is, believe it or not, different!
+-->
+
+\includegraphics[width=0.99\textwidth]{images/ajay3}
+
+## Modern Marketing at CARD.com
+
+\centering
+
+\includegraphics[width=0.9\textwidth]{images/modern_marketing}
+
+## Further Data Partners
+
+* card transaction processors
+* card manufacturers
+* CIP/KYC service providers
+* online ad platforms
+* remarketing networks
+* licensing partners
+* communication engines
+* others
+
+## Infrastructure
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/stack}
+
+<!--
+* MySQL
+* HDFS, Hive
+* Impala, Parquet
+* RImpala, CSV export, RJDBC
+* nightly, hourly cron jobs
+* drush scripts
+* Pentaho, Java, python
+-->
+
+## Why R?
+
+\centering
+
+\includegraphics[width=0.9\textwidth]{images/pentaho}
+
+## Infrastructure
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/stack}
+
+## Why not a Hadoop cluster instead of MySQL?
+
+\vspace*{-6.5mm}
+
+\hspace*{-19mm}
+
+\centering
+\includegraphics[width=\paperwidth]{images/rapporter-infra-with-header}
+
+## Infrastructure
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/stack}
+
+## The Classic Era
+
+\centering
+
+\includegraphics[width=0.865\textwidth]{images/snowplow-era-1}
+
+\footnotesize Source: [SnowPlow](http://snowplowanalytics.com/blog/2014/01/20/the-three-eras-of-business-data-processing/)
+
+## The Hybrid Era
+
+\centering
+
+\includegraphics[width=0.95\textwidth]{images/snowplow-era-2}
+
+\footnotesize Source: [SnowPlow](http://snowplowanalytics.com/blog/2014/01/20/the-three-eras-of-business-data-processing/)
+
+## The Unified Era
+
+\centering
+
+\includegraphics[width=0.87\textwidth]{images/snowplow-era-3}
+
+\footnotesize Source: [SnowPlow](http://snowplowanalytics.com/blog/2014/01/20/the-three-eras-of-business-data-processing/)
+
+## Why Amazon Kinesis & Redshift?
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/kinesis-architecture-crop}
+
+\footnotesize Source: [Kinesis Product Details](https://aws.amazon.com/kinesis/streams/details/)
+
+## Intro to Amazon Kinesis Streams
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/kinesis-architecture-streams}
+
+\footnotesize Source: [Kinesis Developer Guide](http://docs.aws.amazon.com/streams/latest/dev/key-concepts.html)
+
+## Intro to Amazon Kinesis Shards
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/kinesis_core_concepts}
+
+\footnotesize Source: [AWS re:Invent 2013](http://www.slideshare.net/AmazonWebServices/amazon-kinesis-realtime-streaming-big-data-processing-applications-bdt311-aws-reinvent-2013)
+
+## How to Communicate with Kinesis
+
+Writing data to the stream:
+
+* [Amazon Kinesis Streams API](http://docs.aws.amazon.com/streams/latest/dev/developing-producers-with-sdk.html) (!)
+* [Amazon Kinesis Producer Library (KPL)](http://docs.aws.amazon.com/streams/latest/dev/developing-producers-with-kpl.html) from Java
+* [flume-kinesis](https://github.com/sharethrough/flume-kinesis)
+* [Amazon Kinesis Agent](http://docs.aws.amazon.com/firehose/latest/dev/writing-with-agents.html)
+
+Reading data from the stream:
+
+* [Amazon Kinesis Streams API](http://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-sdk.html) (!)
+* [Amazon Kinesis Client Library (KCL)](http://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html) from Java, Node.js, .NET, Python, Ruby
+
+Managing streams:
+
+* [Amazon Kinesis Streams API](http://docs.aws.amazon.com/streams/latest/dev/working-with-streams.html) (!)
+
+## Now We Need an R Client!
+
+Initialize connection to the SDK: \scriptsize
+
+```r
+> library(rJava)
++ .jinit(classpath =
++        list.files(
++            '~/Projects/kineric/inst/java/',
++            full.names = TRUE),
++        parameters = "-Xmx512m")
+```
+
+\normalsize What methods do we have there? \scriptsize
+
+```r
+> kc <- .jnew('com.amazonaws.services.kinesis.AmazonKinesisClient')
+> .jmethods(kc)
+[1]  "public void com.amazonaws.services.kinesis.AmazonKinesisClient.splitShard(java.lang.String,java.lang.String,java.lang.String) throws com.amazonaws.AmazonServiceException,com.amazonaws.AmazonClientException"
+[2]  "public void com.amazonaws.services.kinesis.AmazonKinesisClient.splitShard(com.amazonaws.services.kinesis.model.SplitShardRequest)"
+[3]  "public void com.amazonaws.services.kinesis.AmazonKinesisClient.removeTagsFromStream(com.amazonaws.services.kinesis.model.RemoveTagsFromStreamRequest)"
+[4]  "public com.amazonaws.services.kinesis.model.ListStreamsResult com.amazonaws.services.kinesis.AmazonKinesisClient.listStreams(java.lang.String) throws com.amazonaws.AmazonServiceException,com.amazonaws.AmazonClientException"
+[5]  "public com.amazonaws.services.kinesis.model.ListStreamsResult com.amazonaws.services.kinesis.AmazonKinesisClient.listStreams(java.lang.Integer,java.lang.String) throws com.amazonaws.AmazonServiceException,com.amazonaws.AmazonClientException"
+[6]  "public com.amazonaws.services.kinesis.model.ListStreamsResult com.amazonaws.services.kinesis.AmazonKinesisClient.listStreams() throws com.amazonaws.AmazonServiceException,com.amazonaws.AmazonClientException"
+[7]  "public com.amazonaws.services.kinesis.model.ListStreamsResult com.amazonaws.services.kinesis.AmazonKinesisClient.listStreams(com.amazonaws.services.kinesis.model.ListStreamsRequest)"
+[8]  "public com.amazonaws.services.kinesis.model.GetShardIteratorResult com.amazonaws.services.kinesis.AmazonKinesisClient.getShardIterator(java.lang.String,java.lang.String,java.lang.String) throws com.amazonaws.AmazonServiceException,com.amazonaws.AmazonClientException"
+[9]  "public com.amazonaws.services.kinesis.model.GetShardIteratorResult com.amazonaws.services.kinesis.AmazonKinesisClient.getShardIterator(com.amazonaws.services.kinesis.model.GetShardIteratorRequest)"
+[10] "public com.amazonaws.services.kinesis.model.GetShardIteratorResult com.amazonaws.services.kinesis.AmazonKinesisClient.getShardIterator(java.lang.String,java.lang.String,java.lang.String,java.lang.String) throws com.amazonaws.AmazonServiceException,com.amazonaws.AmazonClientException"
+```
+
+## The First Steps from R
+
+Set API endpoint: \scriptsize
+
+```r
+> kc$setEndpoint('kinesis.us-west-2.amazonaws.com', 'kinesis', 'us-west-2')
+```
+
+\normalsize What streams do we have access to? \scriptsize
+
+```r
+> kc$listStreams()
+[1] "Java-Object{{StreamNames: [test_kinesis],HasMoreStreams: false}}"
+> kc$listStreams()$getStreamNames()
+[1] "Java-Object{[test_kinesis]}"
+```
+
+\normalsize \href{http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/kinesis/model/StreamDescription.html}{Describe} this stream:  \scriptsize
+
+```r
+> (kcstream <- kc$describeStream(StreamName = 'test_kinesis')$getStreamDescription())
+[1] "Java-Object{{StreamName: test_kinesis,StreamARN: arn:aws:kinesis:us-west-2:595739411341:stream/test_kinesis,StreamStatus: CREATING,Shards: [],HasMoreShards: false}}"
+> kcstream$getStreamName()
+[1] "test_kinesis"
+> kcstream$getStreamStatus()
+[1] "ACTIVE"
+> kcstream$getShards()
+[1] "Java-Object{[
+{ShardId: shardId-000000000000,HashKeyRange: {
+StartingHashKey: 0,EndingHashKey: 17014118346046923173168730371588410572324},SequenceNumberRange: {StartingSequenceNumber: 4956289416042714358695481571432376297430913467927668719618,}},
+{ShardId: shardId-000000000001,HashKeyRange: {StartingHashKey: 17014118346046923173168732423715884105728,EndingHashKey: 340236692093846346337460743132432468211455}, SequenceNumberRange: {StartingSequenceNumber: 4956234160449444332153346340517833149186116289174700050,}}]}"
+```
+
+## Writing to the Stream
+
+\scriptsize
+
+```r
+> prr <- .jnew('com.amazonaws.services.kinesis.model.PutRecordRequest')
+> prr$setStreamName('test_kinesis')
+> prr$setData(J('java.nio.ByteBuffer')$wrap(.jbyte(charToRaw('foobar'))))
+> prr$setPartitionKey('42')
+> prr
+[1] "Java-Object{{StreamName: test_kinesis,
+     Data: java.nio.HeapByteBuffer[pos=0 lim=6 cap=6],
+     PartitionKey: 42,}}"
+> kc$putRecord(prr)
+[1] "Java-Object{{ShardId: shardId-000000000001,
+    SequenceNumber: 49562894160449444332153346371084313572324361665031176210}}"
+```
+
+## Get Records from the Stream
+
+\normalsize First, we need a shard iterator, which expires in 5 minutes: \scriptsize
+
+```r
+> sir <- .jnew('com.amazonaws.services.kinesis.model.GetShardIteratorRequest')
+> sir$setStreamName('test_kinesis')
+> sir$setShardId(.jnew('java/lang/String', '0'))
+> sir$setShardIteratorType('TRIM_HORIZON')
+> iterator <- kc$getShardIterator(sir)$getShardIterator()
+```
+
+\normalsize Then we can use it to get records: \scriptsize
+
+```r
+> gir <- .jnew('com.amazonaws.services.kinesis.model.GetRecordsRequest')
+> gir$setShardIterator(iterator)
+> kc$getRecords(gir)$getRecords()
+[1] "Java-Object{[]}"
+```
+
+\pause
+
+\normalsize The data was pushed to the other shard: \scriptsize
+
+```r
+> sir$setShardId(.jnew('java/lang/String', '1'))
+> iterator <- kc$getShardIterator(sir)$getShardIterator()
+> gir$setShardIterator(iterator)
+> kc$getRecords(gir)$getRecords()
+[1] "Java-Object{[{SequenceNumber: 49562894160449444332153346371084313572324361665031176210,
+ApproximateArrivalTimestamp: Tue Jun 14 09:40:19 CEST 2016,
+Data: java.nio.HeapByteBuffer[pos=0 lim=6 cap=6],
+PartitionKey: 42}]}"
+```
+
+## Get Further Records from the Stream
+
+\scriptsize
+
+```r
+> sapply(kc$getRecords(gir)$getRecords(),
++        function(x)
++        rawToChar(x$getData()$array()))
+[1] "foobar"
+> iterator <- kc$getRecords(gir)$getNextShardIterator()
+> gir$setShardIterator(iterator)
+> kc$getRecords(gir)$getRecords()
+[1] "Java-Object{[]}"
+```
+
+\normalsize Get the oldest available data again: \scriptsize
+
+```r
+> iterator <- kc$getShardIterator(sir)$getShardIterator()
+> gir$setShardIterator(iterator)
+> kc$getRecords(gir)$getRecords()
+[1] "Java-Object{[{SequenceNumber: 49562894160449444332153346371084313572324361665031176210,ApproximateArrivalTimestamp: Tue Jun 14 09:40:19 CEST 2016,Data: java.nio.HeapByteBuffer[pos=0 lim=6 cap=6],PartitionKey: 42}]}"
+```
+
+\normalsize Or we can refer to the last known sequence number as well: \scriptsize
+
+```r
+> sir$setShardIteratorType('AT_SEQUENCE_NUMBER')
+> sir$setStartingSequenceNumber('49562894160449444332153346371084313572324361665031176210')
+> iterator <- kc$getShardIterator(sir)$getShardIterator()
+> gir$setShardIterator(iterator)
+> kc$getRecords(gir)$getRecords()
+[1] "Java-Object{[{SequenceNumber: 49562894160449444332153346371084313572324361665031176210,ApproximateArrivalTimestamp: Tue Jun 14 09:40:19 CEST 2016,Data: java.nio.HeapByteBuffer[pos=0 lim=6 cap=6],PartitionKey: 42}]}"
+```
+
+## Managing Shards
+
+\normalsize No need for both shards: \scriptsize
+
+```r
+> ms <- .jnew('com.amazonaws.services.kinesis.model.MergeShardsRequest')
+> ms$setShardToMerge('shardId-000000000000')
+> ms$setAdjacentShardToMerge('shardId-000000000001')
+> ms$setStreamName('test_kinesis')
+> kc$mergeShards(ms)
+```
+
+\normalsize What do we have now? \scriptsize
+
+```r
+> kc$describeStream(StreamName = 'test_kinesis')$getStreamDescription()$getShards()
+[1] "Java-Object{[
+{ShardId: shardId-000000000000,HashKeyRange: {StartingHashKey: 0,EndingHashKey: 170141183460469231731687303715884105727},
+SequenceNumberRange: {
+StartingSequenceNumber: 49562894160427143586954815717376297430913467927668719618,
+EndingSequenceNumber: 49562894160438293959554081028945856364232263390243848194}},
+{ShardId: shardId-000000000001,HashKeyRange: {StartingHashKey: 170141183460469231731687303715884105728,EndingHashKey: 340282366920938463463374607431768211455},
+SequenceNumberRange: {
+StartingSequenceNumber: 49562894160449444332153346340517833149186116289174700050,
+EndingSequenceNumber: 49562894160460594704752611652087392082504911751749828626}},
+{ShardId: shardId-000000000002,
+ParentShardId: shardId-000000000000,
+AdjacentParentShardId: shardId-000000000001,
+HashKeyRange: {StartingHashKey: 0,EndingHashKey: 340282366920938463463374607431768211455},
+SequenceNumberRange: {StartingSequenceNumber: 49562904991497673099704924344727019527317066854965444642,}}]}"
+```
+
+## Next Steps
+
+Ideas:
+
+* R function managing/scaling shards and attaching R processors
+* One R processor per shard (parallel threads on a node or cluster)
+* Store started/finished sequence number in memory/DB (checkpointing)
+
+\begin{example}[Design for a simple MVP on a single node]
+\textit{mcparallel} starts parallel R processes to evaluate the given expression
+\end{example}
+
+\pause
+
+* or Gabor Csardi's `processx` package to manage child processes
+
+\pause
+
+Problems:
+
+* duplicated records after failure due to in-memory checkpoint
+* needs a DB for running on a cluster
+* hard to write good unit tests
+
+\pause
+
+Why not use KCL then?
+
+## Amazon Kinesis Client Library
+
+* An easy-to-use programming model for processing data
+
+```bash
+java -cp amazon-kinesis-client-1.6.1.jar \
+  com.amazonaws.services.kinesis.multilang.MultiLangDaemon \
+  test-kinesis.properties
+```
+
+* Scale-out and fault-tolerant processing (checkpointing via DynamoDB)
+* Logging and metrics in CloudWatch
+* The MultiLangDaemon spawns processes written in any language, communication happens via JSON messages sent over stdin/stdout
+* Only a few events/methods to care about in the consumer application:
+    1. initialize
+	2. processRecords
+	3. checkpoint
+	4. shutdown
+
+<!--
+```
+READ https://github.com/awslabs/amazon-kinesis-client/blob/master/src/main/java/com/amazonaws/services/kinesis/multilang/package-info.java 
+READ https://github.com/awslabs/amazon-kinesis-client-python
+
+
+wget https://raw.githubusercontent.com/awslabs/amazon-kinesis-client/master/pom.xml
+mvn dependency:copy-dependencies
+
+mvn package
+
+java -cp inst/aws-java-sdk-1.11.7.jar::inst/java/amazon-kinesis-client-1.6.1.jar:inst/java/commons-logging-1.1.3.jar:inst/jackson-databind-2.7.5.jar:inst/jackson-core-2.7.5.jar com.amazonaws.services.kinesis.multilang.MultiLangDaemon sample.properties
+
+java -cp "inst/java/amazon-kinesis-client-1.6.1.jar:maven/target/dependency/*" com.amazonaws.services.kinesis.multilang.MultiLangDaemon sample.properties
+
+java -cp /usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/joda-time-2.8.1.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/jackson-core-2.5.3.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/aws-java-sdk-s3-1.10.20.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/protobuf-java-2.6.1.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/amazon-kinesis-client-1.6.1.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/aws-java-sdk-kms-1.10.20.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/aws-java-sdk-kinesis-1.10.20.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/aws-java-sdk-cloudwatch-1.10.20.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/httpclient-4.3.6.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/jackson-annotations-2.5.0.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/guava-18.0.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/commons-logging-1.1.3.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/aws-java-sdk-dynamodb-1.10.20.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/commons-codec-1.6.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/commons-lang-2.6.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/jackson-databind-2.5.3.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/aws-java-sdk-core-1.10.20.jar:/usr/local/lib/python2.7/dist-packages/amazon_kclpy-1.2.0-py2.7.egg/amazon_kclpy/jars/httpcore-4.3.3.jar:/home/daroczig/Projects/kineric/amazon-kinesis-client-python/samples com.amazonaws.services.kinesis.multilang.MultiLangDaemon sample.properties
+
+``` 
+-->
+
+## Messages from the KCL
+
+<!--
+https://github.com/awslabs/amazon-kinesis-client/blob/master/src/main/java/com/amazonaws/services/kinesis/multilang/package-info.java
+-->
+
+1. initialize:
+    * Perform initialization steps
+    * Write "status" message to indicate you are done
+    * Begin reading line from STDIN to receive next action
+2. processRecords:
+    * Perform processing tasks (you may write a checkpoint message at any time)
+	* Write "status" message to STDOUT to indicate you are done.
+	* Begin reading line from STDIN to receive next action
+3. shutdown:
+	* Perform shutdown tasks (you may write a checkpoint message at any time)
+	* Write "status" message to STDOUT to indicate you are done.
+	* Begin reading line from STDIN to receive next action
+4. checkpoint:
+	* Decide whether to checkpoint again based on whether there is an error or not.
+
+## Again: Why R?
+
+\centering
+
+\includegraphics[width=0.9\textwidth]{images/pentaho}
+
+## R Script Interacting with KCL
+
+\scriptsize
+
+```r
+#!/usr/bin/r -i
+
+while (TRUE) {
+
+    ## read and parse messages
+    line <- fromJSON(readLines(n = 1))
+
+    ## nothing to do unless we receive a record to process
+    if (line$action == 'processRecords') {
+
+        ## process each record
+        lapply(line$records, function(r) {
+
+            business_logic(fromJSON(rawToChar(base64_dec(r$data))))
+            catn(toJSON(list(action = 'checkpoint', checkpoint = r$sequenceNumber)))
+
+        })
+    }
+
+    ## return response in JSON
+    catn(toJSON(list(action = 'status', responseFor = line$action)))
+
+}
+```
+
+## Examples
+
+<!-- https://www.lucidchart.com/documents/edit/e91c90f6-7476-4e6a-834c-7198b857bffa?driveId=0ACjOYacj5XqBUk9PVA# -->
+
+\centering
+
+\includegraphics[width=0.99\textwidth]{images/example-stream}
